@@ -1,14 +1,25 @@
 # ICT.Trendora.Web
 
-React and TypeScript frontend scaffold built with Vite. Package name: `ict.trendora.web`; application version: `0.0.0`; private npm package.
+Trendora is a customer-facing e-commerce application under active development, built with React, TypeScript, and Vite. The storefront foundation is implemented. Product data is currently mocked, while authentication, account management, cart, checkout, and backend integration are planned for subsequent phases.
+
+Package name: `ict.trendora.web`; application version: `0.0.0`; private npm package.
 
 ## Purpose and current scope
 
-The application currently displays a starter screen, a local click counter, logos, and documentation links. Entry flow: `index.html` → `src/main.tsx` → `src/App.tsx`, mounted inside React `StrictMode`.
+The default page is a public storefront. Visitors can browse eight fictional products, submit searches, and filter categories without signing in. The UI includes a header, category navigation, promotional sections, local SVG product illustrations, product cards, and a footer.
 
-**Trendora's business purpose is not documented or implemented here yet.** Do not infer a product domain from its name. The inspected repository contains no application routing, API integration, authentication, database integration, backend, or business workflow.
+Entry flow: `index.html` → `src/main.tsx` → `src/app/App.tsx` → `src/app/routes.tsx`. React `StrictMode` wraps the app; `App` owns one React Router `BrowserRouter`.
 
-Before implementing product flows, confirm intended users, use cases, acceptance criteria, API contracts, authentication needs, and supported browsers with the owner. Record confirmed decisions here.
+| URL | Current behavior |
+| --- | --- |
+| `/` | Public homepage; `q` and `category` query parameters filter mock products |
+| `/login` | Email/password form preview with browser validation and a demo status message |
+| `/cart` | Informational placeholder; no cart operations or checkout |
+| Any unmatched URL | Not-found content within the store layout |
+
+**Login does not authenticate, establish a session, or redirect after submission.** A link lets users return to browsing. Products and prices are explicitly sample data. Product detail pages, account dashboards, orders, addresses, real authentication, API/backend integration, payments, and checkout are not implemented.
+
+For current architecture, file responsibilities, and the remaining phases, read [docs/architecture.md](./docs/architecture.md). Confirm backend contracts, authentication method, supported browsers, deployment, and production storefront rendering requirements before implementing those flows.
 
 ## Control whether the agent suggests or implements
 
@@ -57,12 +68,13 @@ No test script or test framework is configured. No environment variables or API 
 
 ## Versions and package responsibilities
 
-Snapshot: **2026-11-17**, verified against `package.json`, `package-lock.json`, and `npm ls --depth=0`. Installed direct versions matched the lockfile. Declared ranges allow updates; the lockfile records exact resolutions. Re-check these files instead of treating this table as permanently current.
+Snapshot: **2026-11-18**, checked against `package.json`, `package-lock.json`, and installed package metadata. All 15 direct dependencies matched their locked versions. The same-day dependency review compared 164 installed lockfile entries, including transitive packages, with no version mismatches. Declared ranges allow updates; the lockfile records exact resolutions. Re-check these files instead of treating this table as permanently current.
 
 | Package | Declared range | Locked / installed | Purpose |
 | --- | --- | --- | --- |
 | `react` | `^19.3.1` | `19.3.1` | Components and state |
 | `react-dom` | `^19.3.1` | `19.3.1` | React rendering in the browser |
+| `react-router` | `7.18.5` (exact) | `7.18.5` | Client-side routes, navigation, and URL search parameters |
 | `@eslint/js` | `^10.0.1` | `10.0.1` | Recommended JavaScript lint rules |
 | `@types/node` | `^24.19.2` | `24.19.2` | Node API type declarations |
 | `@types/react` | `^19.3.0` | `19.3.0` | React type declarations |
@@ -76,7 +88,7 @@ Snapshot: **2026-11-17**, verified against `package.json`, `package-lock.json`, 
 | `typescript-eslint` | `^8.72.1` | `8.73.0` | TypeScript lint integration |
 | `vite` | `^8.3.6` | `8.3.8` | Development server and production bundling |
 
-Only React and React DOM are runtime dependencies; the others are development dependencies. Transitive versions are recorded in `package-lock.json`. There is no separate UI component library. `App` is local code with no independent package version.
+React, React DOM, and React Router are runtime dependencies; the others are development dependencies. Transitive versions are recorded in `package-lock.json` (lockfile format version 3). There is no separate UI component library. Local components have no independent package version.
 
 ## Compatibility findings
 
@@ -84,6 +96,7 @@ Based on locked package metadata and local checks:
 
 - Vite `8.3.8` and React plugin `6.3.0` require Node `^20.19.0 || >=22.12.0`; ESLint `10.15.0` requires `^20.19.0 || ^22.13.0 || >=24`. Observed Node `22.20.0` satisfies these constraints.
 - The plugin expects Vite `^8.0.0`; React DOM expects React `^19.3.1`. Installed versions satisfy these peer requirements. Peer dependencies specify versions an integration expects the host application to provide.
+- Installed React Router `7.18.5` declares Node `>=20.0.0` and React/React DOM `>=18`; the local versions satisfy those requirements. During selection, npm metadata for Router `8.5.1` declared Node `>=22.22.0`, which excluded the observed Node `22.20.0`. Version 7.18.5 was selected without upgrading Node. Re-check metadata before any future upgrade.
 - `typescript-eslint` supports TypeScript `>=4.8.4 <6.1.0` and ESLint `^8.57.0 || ^9.0.0 || ^10.0.0`; installed versions fit. These ranges also appear in the [official compatibility guidance](https://typescript-eslint.io/users/dependency-versions/) checked on the snapshot date.
 - `@types/node` targets Node 24 while the observed runtime is Node 22. Types do not upgrade the runtime. Verify actual API availability before using Node APIs; aligning type and runtime majors is a future maintenance decision, not a demonstrated current failure.
 - `npm ls --all` succeeded with absent optional dependencies, including platform-specific packages. An optional entry alone does not prove a broken installation; determine whether the requested feature needs it.
@@ -96,9 +109,16 @@ These checks demonstrate a working local build, not exhaustive compatibility acr
 | Path | Responsibility |
 | --- | --- |
 | `src/main.tsx` | React root and global styles |
-| `src/App.tsx` | Starter screen and counter state |
-| `src/App.css`, `src/index.css` | Component and global CSS |
-| `src/assets/`, `public/` | Imported and public static assets |
+| `src/app/App.tsx`, `src/app/routes.tsx` | BrowserRouter and centralized route definitions |
+| `src/app/layouts/StoreLayout.tsx` | Store header/footer, homepage category navigation, and child route outlet |
+| `src/features/storefront/` | Homepage, search header, category navigation, footer, and page styling |
+| `src/features/products/` | Product types, reusable product cards, and decorative SVG artwork |
+| `src/features/auth/` | Login preview page/form; remaining auth files are placeholders |
+| `src/shared/` | Button, TextField, and INR formatting; other scaffold files remain empty |
+| `src/mocks/data/products.ts` | Eight fictional catalogue entries; supplied to HomePage by the app layer |
+| `src/styles/tokens.css`, `src/styles/global.css` | Active design tokens and global styles |
+| `src/App.css`, `src/index.css`, `src/assets/`, `public/` | Retained starter CSS/assets; no current source references found |
+| `docs/architecture.md` | Current implementation, full project map, planned work, and validation limits |
 | `vite.config.ts` | Vite with React plugin |
 | `eslint.config.js` | Flat ESLint configuration for TypeScript/TSX |
 | `tsconfig*.json` | App and tooling TypeScript projects |
@@ -109,19 +129,24 @@ Type-aware ESLint rules are not configured. TypeScript configs do not explicitly
 
 ## Validation snapshot
 
-On 2026-11-17, using the existing local installation:
+During the storefront implementation on **2026-11-18**, using the existing local installation:
 
 - `npm run build`: passed, including TypeScript checks and Vite output.
 - `npm run lint`: passed.
 - `npm ls --depth=0` and `npm ls --all`: completed successfully.
 
-A fresh `npm ci`, browser interaction checks, automated behavior tests, security audit, and deployment validation were not performed. Repeat relevant checks after changes; this snapshot is not proof of future behavior.
+A same-day read-only dependency review confirmed matching package versions and no dependency-tree problems. This documentation update checks documentation against source/configuration; it does not rerun the build, lint, or browser tests.
+
+Browser verification was attempted but not completed: local preview access encountered isolation issues, and Windows Computer Use stopped because it could not confidently determine the browser URL. Responsive CSS and interactions are implemented but not browser-verified. A fresh `npm ci`, automated behavior tests, and production deployment validation have not been performed.
+
+The **2026-11-18 npm audit reported 11 high-severity findings** in the Vite/TypeScript-ESLint tooling dependency chain, including transitive `picomatch`/`tinyglobby` dependencies. React Router was not listed among the affected packages in that report. No automatic or forced dependency fixes were applied. This is a dated result, not a current security guarantee; reassess before production and review fixes for compatibility.
 
 ## Official implementation references
 
 Use documentation for the installed release. Current pages can describe newer versions; consult maintainer release tags and migration notes when needed.
 
 - [React documentation](https://react.dev/learn)
+- [React Router 7.18.5 routing guide (tagged official source)](https://github.com/remix-run/react-router/blob/react-router%407.18.5/docs/start/declarative/routing.md)
 - [Vite guide](https://vite.dev/guide/) and [configuration](https://vite.dev/config/)
 - [React plugin maintainer repository](https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react)
 - [TypeScript TSConfig reference](https://www.typescriptlang.org/tsconfig/)

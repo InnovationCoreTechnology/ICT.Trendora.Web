@@ -1,327 +1,308 @@
-# Trendora frontend architecture and implementation guide
+# Trendora frontend architecture
 
-Status: proposed architecture with a verified repository audit, 2026-11-18.
+Last reviewed: **2026-11-18**. This document describes the current implementation of the application under active development and labels future work separately. It is a project architecture decision, not a required React folder standard.
 
-This document was requested explicitly. Application code, dependencies, and folders were not repaired or deleted during this documentation task. `AGENT_MODE` remains `SUGGEST`. Examples below are implementation guidance, not running application code.
+## 1. Product scope and current status
 
-## 1. Scope and decisions
+Trendora is a customer-facing e-commerce application under active development. The storefront foundation is implemented, with mock product data used while backend integration is pending. The **public storefront is the default page**; browsing does not require login. Authentication, account management, cart, and checkout are planned for subsequent phases. Seller/admin dashboards are outside the first milestone.
 
-Build the customer-facing e-commerce experience first: storefront, demo login, account overview, orders, and addresses. Use clearly labeled mock data; no backend currently exists for this project. Seller/admin dashboards, real authentication, payments, and real order creation are later work.
+Implemented in source:
 
-Use feature-based organization with shared UI and centralized application composition. This is a project recommendation, not a mandatory React directory standard. A folder does not provide working functionality by itself.
+- Shared store header, search form, homepage category navigation, footer, and layout.
+- HomePage with promotional sections, eight fictional products, product cards, and local decorative SVG illustrations.
+- Search and category filtering through URL query parameters, plus an empty-results state and a clear-filters link.
+- Client routing for the homepage, login preview, cart placeholder, and unmatched URLs.
+- Login form with required email/password fields, browser email validation, and a demo status message; reusable Button and TextField.
+- Active global/design-token CSS and page/layout styles with responsive rules.
+- A link from the login preview back to the public storefront.
 
-Proposed default after direct login: `/account`. Visiting `/` should continue to display the public storefront. If login interrupts an allowed account journey, return to that destination after success. The default is a configurable product choice, not an existing behavior.
+**Not implemented:** authentication, demo session state, logout, protected routes, successful-login redirects, product detail pages, cart operations, checkout, account dashboard, orders, addresses, backend/API integration, payments, or persistence. The login form only prevents normal form navigation and shows a message. It does not call the empty auth service.
 
-## 2. Verified repository audit
+Build and lint passed during the storefront implementation. Browser verification remains incomplete; source-level functionality is not a browser-test result. See section 10.
 
-Inspected files, directory existence, sizes, imports, package manifest, lockfile root, and installed direct packages. All paths below are relative to the repository root.
+## 2. Runtime and dependency baseline
 
-| Area | Finding | Required next action |
-| --- | --- | --- |
-| `public/`, `src/assets/` | Present | Keep |
-| `src/app/App.tsx` | Present; contains the original starter screen | Repair relative imports before other work |
-| `src/main.tsx` | Correctly imports `./app/App.tsx` | Keep this import |
-| `src/app/routes.tsx` | Present but empty | Implement during routing phase |
-| `src/app/providers/` | Present | Reserve for application provider composition |
-| Layout files | Created under `src/app/providers/layouts/` | Move to `src/app/layouts/`; providers and layouts are siblings |
-| All proposed auth files | Present but empty | Implement gradually; they currently export no usable components/functions |
-| `storefront/`, `products/`, `account/`, `orders/` | Present under `src/features/` | Add feature files when needed |
-| Shared UI/form files, `httpClient.ts`, `formatCurrency.ts` | Present but empty | Keep as placeholders or implement when required |
-| `src/mocks/` | Missing | Create `data/` and `services/` during the mock feature phase |
-| Mock product/order/auth files | Missing | Add the three files shown in the target tree |
-| `src/styles/tokens.css`, `global.css` | Present but empty | Populate before replacing existing styles |
-| `src/App.css`, `src/index.css` | Existing starter styles remain | Do not delete before migrating their consumers |
-| `docs/architecture.md` | Was empty | Populated by this documentation task |
-| `package.json`, lockfile, Vite config | Present | Keep; router is not installed |
-
-### Immediate import problem
-
-Moving a file changes the base directory for its relative imports. `src/app/App.tsx` still uses `./assets/...` and `./App.css`. Those resolve to nonexistent paths under `src/app/`.
-
-To retain the starter temporarily, replace its four relative imports with:
-
-```tsx
-// In src/app/App.tsx
-import heroImg from '../assets/hero.png'
-import reactLogo from '../assets/react.svg'
-import viteLogo from '../assets/vite.svg'
-import '../App.css'
-```
-
-`..` means the parent directory: from `src/app` back to `src`. Also update the starter's visible `src/App.tsx` instruction to `src/app/App.tsx`, or remove it when replacing the starter UI.
-
-This is a source-inspection finding: all four current target paths were checked and do not exist. No build was run during this audit; do not reuse the README's earlier successful build as proof of the current moved-file state.
-
-### Versions observed
-
-| Package/runtime | Installed version |
+| Component | Observed version |
 | --- | --- |
+| Application | 0.0.0 |
 | React / React DOM | 19.3.1 / 19.3.1 |
+| React Router | 7.18.5, pinned exactly |
 | TypeScript | 6.0.3 |
 | Vite | 8.3.8 |
-| React Vite plugin | 6.3.0 |
+| Vite React plugin | 6.3.0 |
 | ESLint | 10.15.0 |
-| Node.js | 22.20.0 |
-| React Router | Not installed |
+| Node.js / npm | 22.20.0 / 10.9.3 |
 
-`npm ls --depth=0` completed successfully. No dependencies were installed or changed. Router examples use the declarative APIs shown in the official documentation, which displayed version 8.5.1 at inspection. That is a documentation version, not a selected or compatibility-approved project dependency. Check exact engines, peer requirements, and release notes before installation.
+The [README package table](../README.md#versions-and-package-responsibilities) lists all 15 direct dependencies, their manifest ranges, resolved versions, and purposes. `package-lock.json` uses format version 3. All direct installed versions match the lockfile; the same-day audit found no mismatch across 164 installed lockfile entries.
 
-## 3. Correct target structure
+React Router 7.18.5 declares Node >=20.0.0 and React/React DOM >=18. These requirements fit the installed environment. During selection, Router 8.5.1 declared Node >=22.22.0, which did not fit Node 22.20.0. Version 8 was not installed. Check exact package metadata before future changes rather than assuming latest documentation matches this project.
 
-This is the originally proposed baseline. Additional routing/session files are listed in section 6 and should be introduced when implementing that phase.
+There is no `engines`, `packageManager`, or Node version file enforcing the runtime. `@types/node` 24.19.2 targets a newer major than the observed runtime; verify Node API availability before using it. No routing/form/state library other than React Router has been added. There is no automated test runner.
+
+## 3. Current project map
+
+Paths below are relative to the repository root. `[empty]` means a placeholder file with no implementation. Empty directories are shown for orientation but Git does not track them by themselves.
 
 ```text
 ICT.Trendora.Web/
-|-- public/
+|-- public/                              # Retained starter assets
+|-- docs/
+|   `-- architecture.md
 |-- src/
 |   |-- app/
-|   |   |-- App.tsx
-|   |   |-- routes.tsx
-|   |   |-- providers/
+|   |   |-- App.tsx                       # Owns one BrowserRouter
+|   |   |-- routes.tsx                    # Active centralized routes
+|   |   |-- providers/                    # Reserved; no provider implementation
 |   |   `-- layouts/
 |   |       |-- StoreLayout.tsx
-|   |       `-- AccountLayout.tsx
+|   |       |-- StoreLayout.css
+|   |       `-- AccountLayout.tsx         # [empty]
 |   |-- features/
-|   |   |-- auth/
-|   |   |   |-- pages/LoginPage.tsx
-|   |   |   |-- components/LoginForm.tsx
-|   |   |   |-- hooks/useLogin.ts
-|   |   |   |-- services/auth.service.ts
-|   |   |   |-- validation/login.validation.ts
-|   |   |   |-- auth.types.ts
-|   |   |   `-- index.ts
 |   |   |-- storefront/
+|   |   |   |-- components/
+|   |   |   |   |-- StoreHeader.tsx
+|   |   |   |   |-- CategoryNav.tsx
+|   |   |   |   `-- StoreFooter.tsx
+|   |   |   `-- pages/
+|   |   |       |-- HomePage.tsx
+|   |   |       `-- HomePage.css
 |   |   |-- products/
-|   |   |-- account/
-|   |   `-- orders/
+|   |   |   |-- product.types.ts
+|   |   |   `-- components/
+|   |   |       |-- ProductCard.tsx
+|   |   |       `-- ProductArtwork.tsx
+|   |   |-- auth/
+|   |   |   |-- pages/
+|   |   |   |   |-- LoginPage.tsx
+|   |   |   |   `-- LoginPage.css
+|   |   |   |-- components/LoginForm.tsx
+|   |   |   |-- hooks/useLogin.ts          # [empty]
+|   |   |   |-- services/auth.service.ts   # [empty]
+|   |   |   |-- validation/login.validation.ts # [empty]
+|   |   |   |-- auth.types.ts              # [empty]
+|   |   |   `-- index.ts                   # [empty]
+|   |   |-- account/                      # No implemented pages
+|   |   `-- orders/                       # No implemented pages
 |   |-- shared/
 |   |   |-- components/
 |   |   |   |-- ui/
 |   |   |   |   |-- Button.tsx
-|   |   |   |   |-- Card.tsx
-|   |   |   |   `-- Alert.tsx
+|   |   |   |   |-- Card.tsx               # [empty]
+|   |   |   |   `-- Alert.tsx              # [empty]
 |   |   |   `-- forms/
 |   |   |       |-- TextField.tsx
-|   |   |       `-- PasswordField.tsx
-|   |   |-- api/httpClient.ts
-|   |   `-- lib/formatCurrency.ts
+|   |   |       `-- PasswordField.tsx     # [empty]
+|   |   |-- api/httpClient.ts             # [empty]
+|   |   `-- lib/formatCurrency.ts         # INR display formatting
 |   |-- mocks/
 |   |   |-- data/
-|   |   |   |-- products.ts
-|   |   |   `-- orders.ts
-|   |   `-- services/mockAuth.service.ts
+|   |   |   |-- products.ts               # Eight fictional entries
+|   |   |   `-- orders.ts                 # [empty]
+|   |   `-- services/mockAuth.service.ts  # [empty]
 |   |-- styles/
-|   |   |-- tokens.css
-|   |   `-- global.css
-|   |-- assets/
-|   `-- main.tsx
-|-- docs/architecture.md
+|   |   |-- tokens.css                    # Active design values
+|   |   `-- global.css                    # Active base/control styles
+|   |-- assets/                          # Retained starter artwork
+|   |-- App.css                          # Unused starter stylesheet
+|   |-- index.css                        # Unused starter stylesheet
+|   `-- main.tsx                         # Mounting and global CSS imports
+|-- .gitignore
+|-- AGENTS.md
+|-- README.md
+|-- index.html
 |-- package.json
 |-- package-lock.json
-`-- vite.config.ts
+|-- eslint.config.js
+|-- tsconfig.json
+|-- tsconfig.app.json
+|-- tsconfig.node.json
+|-- vite.config.ts
+|-- node_modules/                        # Generated; ignored by Git
+`-- dist/                                # Generated build output; ignored by Git
 ```
 
-Keep root `index.html`, `.gitignore`, ESLint and TypeScript configs, README, and AGENTS.md even though the abbreviated tree does not list them. Git does not track empty directories; implement real files as phases progress, or use an intentional `.gitkeep` placeholder when preserving an empty folder is necessary.
+Root file responsibilities:
 
-## 4. Ownership and dependency rules
-
-| Location | Responsibility |
+| File | Purpose |
 | --- | --- |
-| `app/` | Connect features, router, layouts, and shared providers; comparable to startup wiring in .NET |
-| Feature `pages/` | Compose screens and coordinate page-level navigation |
-| Feature `components/` | Business-specific presentation such as login forms or order cards |
-| Feature `hooks/` | React state and interaction coordination where separation is useful |
-| Feature `services/` | Typed data-access contracts and real implementations when the backend exists |
-| Feature `validation/` | Pure client-side field checks; backend validation remains necessary |
-| `shared/components/` | Feature-independent buttons, fields, feedback, and containers |
-| `shared/api/` | Shared transport behavior; do not put feature URLs or redirect policy here |
-| `mocks/` | Demo fixtures and service implementations |
-| `styles/` | Global base styles and design values |
+| `index.html` | Browser entry, root element, title and description |
+| `package.json` | Package identity, scripts, and dependency declarations |
+| `package-lock.json` | Exact resolved dependency graph |
+| `vite.config.ts` | React plugin and Vite configuration |
+| `tsconfig.json` | References the app and tooling TypeScript projects |
+| `tsconfig.app.json` | TypeScript settings for `src`; ES2023, bundler resolution |
+| `tsconfig.node.json` | Tooling settings for `vite.config.ts` |
+| `eslint.config.js` | Flat JavaScript/TypeScript/React lint configuration |
+| `.gitignore` | Excludes generated output, dependencies, and specified local files |
+| `AGENTS.md` | Evidence, compatibility, execution-mode, and validation instructions |
+| `README.md` | Project overview, setup, versions, and validation record |
 
-Import direction: `app -> features -> shared`; `app` can also use `shared` and select mock implementations. Shared code must not import features or app code. Features must not import `app/routes.tsx`. Avoid circular dependencies. Public feature exports belong in the feature's `index.ts`; feature internals should use direct local imports.
+Keep these files outside `src`. Neither the runtime nor build configuration should be removed just because it is not a feature module. Type-aware ESLint rules and an explicit TypeScript `strict` option are not configured. No import alias or React Compiler is configured.
 
-Keep session state in the auth feature, and mount its provider through `app/providers`. A shared button must not know how login or navigation works. No need for a dependency-injection library: passing a typed service into a provider is sufficient for the prototype.
-
-## 5. Safe cleanup checklist
-
-There are no files that must be deleted immediately. Interpret cleanup as migration followed by removal of unused files, not deletion of the working entry point.
-
-| Candidate | Action and prerequisite |
-| --- | --- |
-| `src/app/providers/layouts/StoreLayout.tsx` | Move to `src/app/layouts/StoreLayout.tsx`; preserve contents |
-| `src/app/providers/layouts/AccountLayout.tsx` | Move to `src/app/layouts/AccountLayout.tsx`; preserve contents |
-| Old `src/app/providers/layouts/` directory | Remove only after both files are moved and the directory is empty |
-| `src/App.css` | Remove only after replacing the starter and removing its import or migrating required rules |
-| `src/index.css` | Remove only after migrating desired styles and updating `main.tsx` |
-| `src/assets/hero.png`, `react.svg`, `vite.svg` | Remove only after replacing all starter references |
-| `public/icons.svg` | Remove only after removing starter SVG references |
-| `public/favicon.svg` | Replace or remove only after updating the reference in `index.html` |
-| Empty new TS/TSX files | Not harmful merely because empty; do not import them as components until they have exports |
-
-The old `src/App.tsx` is already absent: do not recreate it alongside `src/app/App.tsx`. Preserve `main.tsx`, `index.html`, package/config files, and the lockfile. Do not delete `node_modules` or the lockfile to solve an import-path problem.
-
-## 6. Configuration order
-
-1. Repair the four `App.tsx` imports and move layouts to the intended sibling folder. First restore a working baseline.
-2. Populate `styles/tokens.css` with design values and `styles/global.css` with base styles. Then import both from `main.tsx`, in that order. Remove the old global CSS import only after migration. Current starter CSS includes root width/text alignment rules unsuitable for blindly carrying into every new page.
-3. Select an exact compatible React Router version using official package metadata and release notes. Verify React 19.3.1, Node 22.20.0, and the installed TypeScript tooling. Install only during an implementation-authorized task; update the manifest and lockfile together. Do not mix tutorials using different router modes or package versions.
-4. For this prototype, use declarative routing with one `BrowserRouter`. Add `app/providers/AppProviders.tsx` to compose the router and auth provider. Add `features/auth/context/AuthProvider.tsx` and its context/hook module to own demo session state. Inject the mock service from the app layer.
-5. Add `app/navigation.ts` for path constants and redirect policy. Add `app/guards/RequireAuth.tsx` for protected route UI. These are additional proposed files, not missing items from the original baseline tree.
-6. Implement exported page/layout components before importing them into `app/routes.tsx`. Replace the starter in `app/App.tsx` with the routes component. Keep root mounting in `main.tsx`.
-7. Use relative imports initially. No alias is configured; introducing `@/` requires matching TypeScript and Vite configuration. Folder creation alone needs no Vite configuration change.
-8. Before deployment, configure the selected host to serve the SPA entry for client page URLs while preserving assets/API handling. Verify a direct visit and refresh on `/account/orders`. Exact hosting rules depend on the host and have not been selected.
-
-Composition outline (design, not executable code):
+## 4. Current execution and data flow
 
 ```text
-main.tsx
-  StrictMode
-    AppProviders
-      BrowserRouter
-        AuthProvider (receives mock auth service)
-          App
-            AppRoutes
+index.html
+  -> main.tsx (tokens.css, global.css, StrictMode)
+     -> app/App.tsx (BrowserRouter)
+        -> app/routes.tsx
+           |-- StoreLayout (header, conditional categories, Outlet, footer)
+           |   |-- /       -> HomePage -> ProductCard -> ProductArtwork
+           |   |-- /cart   -> informational placeholder
+           |   `-- *       -> not-found content
+           `-- /login      -> LoginPage -> LoginForm -> TextField + Button
 ```
 
-The diagram represents nesting once, not providers that recursively include themselves. Keep `AuthProvider` independent of route destinations; navigation policy belongs to the application layer.
+`StoreLayout` uses an `Outlet` for its matched child route. CategoryNav appears only when the pathname is `/`. Login has its own presentation outside the store layout. Cart and not-found content are currently inline in `routes.tsx`; there are no separate CartPage or NotFoundPage modules yet.
 
-Official router installation guide: https://reactrouter.com/start/declarative/installation
+Mock product flow:
 
-## 7. Central routing and default pages
-
-Proposed route map:
-
-| URL | Page | Access/layout |
-| --- | --- | --- |
-| `/` | `features/storefront/pages/HomePage.tsx` | Public / StoreLayout |
-| `/login` | Existing auth LoginPage placeholder, once implemented | Public |
-| `/account` | `features/account/pages/AccountPage.tsx` | Demo session / AccountLayout |
-| `/account/orders` | `features/orders/pages/OrdersPage.tsx` | Demo session / AccountLayout |
-| `/account/addresses` | `features/account/pages/AddressesPage.tsx` | Demo session / AccountLayout |
-| Unmatched URL | `app/pages/NotFoundPage.tsx` | Show a useful not-found screen |
-
-A layout renders common page structure and an `Outlet`, the location where a matched child page appears. An index route is the default child at the parent URL. Keep this mapping in one `app/routes.tsx`, rather than switching pages with local boolean flags.
-
-Abbreviated route illustration: component imports and implementations are prerequisites and intentionally omitted.
-
-```tsx
-<Routes>
-  <Route element={<StoreLayout />}>
-    <Route index element={<HomePage />} />
-  </Route>
-  <Route path="login" element={<LoginPage />} />
-  <Route element={<RequireAuth />}>
-    <Route path="account" element={<AccountLayout />}>
-      <Route index element={<AccountPage />} />
-      <Route path="orders" element={<OrdersPage />} />
-      <Route path="addresses" element={<AddressesPage />} />
-    </Route>
-  </Route>
-  <Route path="*" element={<NotFoundPage />} />
-</Routes>
+```text
+mocks/data/products.ts
+  -> app/routes.tsx supplies products as props
+     -> HomePage filters the list
+        -> ProductCard renders each product
+           -> formatCurrency formats the sample price in INR
 ```
 
-Use React Router's `Link`/`NavLink` for internal navigation. See official routing guidance: https://reactrouter.com/start/declarative/routing
+The app layer chooses the mock dataset. HomePage does not import the mock file directly. There is no HTTP request, product service, loading simulation, cart action, or product detail navigation in this flow. SVG illustrations are local decorative artwork, not product photographs.
 
-## 8. Centralize successful-login redirects
+## 5. Routes, search, and login behavior today
 
-Do not put `window.location` changes or destination strings into reusable form fields, the HTTP client, or mock services. Put the destination decision in `app/navigation.ts`, and coordinate it through an app-owned `LoginRoute` wrapper around `LoginPage`.
-
-Suggested additional file: `app/pages/LoginRoute.tsx`. In the route illustration above, replace the direct `LoginPage` element with this wrapper when implementing navigation. It reads router state, passes an `onAuthenticated` callback to `LoginPage`, and uses the shared redirect function. The feature receives a callback rather than importing `app/`.
-
-Example policy for the initial fixed account routes (proposed TypeScript; not installed):
-
-```ts
-// src/app/navigation.ts
-export const paths = {
-  home: '/',
-  login: '/login',
-  account: '/account',
-  orders: '/account/orders',
-  addresses: '/account/addresses',
-} as const
-
-export const DEFAULT_AFTER_LOGIN = paths.account
-
-const allowedReturnPaths: ReadonlySet<string> = new Set([
-  paths.account,
-  paths.orders,
-  paths.addresses,
-])
-
-export function getPostLoginPath(requested: unknown): string {
-  if (typeof requested === 'string' && allowedReturnPaths.has(requested)) {
-    return requested
-  }
-  return DEFAULT_AFTER_LOGIN
-}
-```
-
-To default to the storefront instead, change `DEFAULT_AFTER_LOGIN` to `paths.home`. Do not change every form. This minimal allowlist deliberately rejects external URLs, login itself, unknown routes, and paths with query/hash suffixes. Extend it deliberately for future dynamic routes or preserved search parameters; never accept an arbitrary `returnUrl` unchecked.
-
-Login flow:
-
-1. `RequireAuth` reads session status: `checking`, `anonymous`, or `authenticated`.
-2. While checking, show a pending screen; do not redirect prematurely.
-3. For an anonymous visit to an account route, navigate to login with replacement and save the desired pathname in router state as `returnTo`.
-4. The login feature performs the demo sign-in. It updates shared session state only after success. On failure, remain on login and display the error.
-5. The app-owned login wrapper resolves `returnTo` with `getPostLoginPath` and navigates once the session is authenticated. Use the same policy for already-authenticated visitors to login.
-6. `navigate(destination, { replace: true })` replaces the login history entry. This avoids leaving the intermediate login screen as the immediate Back destination; it does not erase the browser's full history.
-7. Logout clears demo session and user-specific data, then navigates to login with replacement. Protected screens must not remain visible after logout.
-
-Examples:
-
-| Entry | Result after successful demo login |
+| URL | Behavior |
 | --- | --- |
-| Open login directly | `/account` |
-| Open orders while signed out | `/account/orders` |
-| Invalid/external requested destination | `/account` |
-| Failed sign-in | Stay on `/login` |
+| `/` | Public HomePage; no login guard |
+| `/?q=lamp` | Case-insensitive match against product name, category, and description |
+| `/?category=Home` | Exact category filter |
+| `/?q=lamp&category=Home` | Both filters applied |
+| `/login` | Form preview; successful browser validation shows a message only |
+| `/cart` | Explains that cart/checkout are not implemented |
+| Any unmatched URL | Not-found content under StoreLayout |
 
-Keep demo session in memory initially; browser refresh resets it. Label the flow as a demo. Frontend route guards organize UX, not real authorization. The eventual backend must validate the session and permissions for every protected operation. Cookie/token and session-restoration contracts remain undecided.
+`StoreHeader` submits search via router navigation to `/`, preserving other current query parameters. CategoryNav updates `category` while preserving the current query. HomePage reads the same URL parameters; filtered views hide the promotional sections. The clear-filters link returns to `/`. Unknown categories or unmatched queries produce the empty-results view.
 
-Official navigation references: https://reactrouter.com/api/hooks/useNavigate and https://reactrouter.com/api/components/Navigate
+Search values are URL state rather than a separate global store. This implementation is designed to support refresh and history navigation, but those interactions have not been browser-verified.
 
-## 9. Add a new form or flow
+The login form uses uncontrolled HTML inputs, native required/email validation, and React state for its feedback message. It neither reads credentials for authentication nor persists them. There is no success redirect, session provider, or logout behavior. The return-to-store link is user navigation, not successful authentication.
 
-Example: adding customer addresses.
+## 6. Layer ownership and conventions
 
-1. Create `features/account/pages/AddressesPage.tsx` to assemble the screen.
-2. Create `features/account/components/AddressForm.tsx` to own field values, field errors, and submission UI. Reuse shared fields and buttons.
-3. Add address types and pure validation within `features/account/`; do not put address rules in `shared/components/forms`.
-4. Add a feature service contract and a mock implementation. The app/provider selects the implementation so the page is not coupled to demo data.
-5. Register the page under `/account` in `app/routes.tsx`. Parent account layout and protection are reused.
-6. Add an account navigation link and, if appropriate, add the URL to the post-login return allowlist.
-7. Decide the successful-save behavior: stay with a confirmation or return to the address list. Login default policy should not override ordinary form-save navigation.
-8. Check required fields, server-style failures, duplicate submission, editing/canceling, empty results, keyboard access, and mobile layout. Clearly state that in-memory changes reset on refresh.
+| Area | Responsibility |
+| --- | --- |
+| `app/` | Startup composition, route definitions, layouts, and selection of implementations/data |
+| Feature `pages/` | Screen composition and feature-level presentation |
+| Feature `components/` | Business-specific UI such as product cards and login forms |
+| Feature `hooks/` | Future extracted React interaction/state coordination when useful |
+| Feature `services/` | Future feature data-access contracts and implementations |
+| Feature `validation/` | Future pure field checks; backend validation is still required |
+| `shared/components/` | Feature-independent controls |
+| `shared/lib/` | Small reusable non-React helpers |
+| `shared/api/` | Future shared HTTP transport, not business routing policy |
+| `mocks/` | Fictional development fixtures and future mock service implementations |
 
-A form does not always need a route: an inline edit form or dialog can belong to an existing page. A route is needed when the screen should have its own addressable URL.
+Recommended import direction: `app -> features -> shared`. The app can select mocks. Shared code must not depend on features/app. Feature code must not import `app/routes.tsx`. Explicit cross-feature imports, such as storefront using product components, are allowed when intentional and acyclic. Import boundaries are conventions, not lint-enforced rules yet.
 
-## 10. Implementation phases and checks
+Types describe expected shapes; they are not runtime validation of server responses. Product types live in the products feature. The currency helper remains shared. New forms should own their own values and business validation while reusing TextField and Button. Avoid adding global state or a generic form generator without a concrete need.
 
-| Phase | Deliverable | Verification |
+Styles load from `tokens.css` then `global.css`, plus StoreLayout, HomePage, and LoginPage CSS. Ordinary CSS is not automatically component-scoped; use specific class names. Storefront CSS currently contains some literal design values as well as shared styles; a later design-system pass can consolidate repeated values without pretending this is already complete.
+
+## 7. Completed changes and remaining cleanup
+
+| Earlier issue or plan | Current state |
+| --- | --- |
+| Starter counter was the default | Replaced by public storefront routing |
+| App moved into `src/app` with broken starter imports | Starter imports removed; App now imports router and AppRoutes |
+| Layouts under `providers/layouts` | StoreLayout and AccountLayout now reside in `app/layouts` |
+| Mocks missing | Product fixtures implemented; order/auth mocks remain empty |
+| Styles empty | Shared styles, layout styles, homepage styles, and login styles populated |
+| Router absent | React Router 7.18.5 installed and used |
+| Generic HTML title | Trendora title and demo description added; starter favicon reference removed |
+| Documentation described the counter | README and this guide now describe the application under active development, separating implemented features from mocks and planned work |
+
+No immediate deletion is required. `src/App.css`, `src/index.css`, starter artwork in `src/assets`, and starter files under `public` have no current source references found in the review. They are cleanup candidates, not active styles/assets. Re-run a reference search before removing them in a separately scoped cleanup. Keep all root configuration and lockfiles. Do not recreate the old `src/App.tsx` alongside the current entry component.
+
+Empty scaffold files are reserved for later phases; they do not provide working components/services and should not be imported as though they do. AccountLayout is still empty.
+
+## 8. Future session and redirect design — not implemented
+
+Keep browsing public. After a future successful login, the fallback destination should be the **homepage `/`**, reflecting the agreed storefront-first experience. If login interrupts an allowed account journey, return to that destination. This supersedes the earlier proposal to always default to `/account`.
+
+Proposed future files:
+
+| File | Future purpose |
+| --- | --- |
+| `app/navigation.ts` | Path constants, default-after-login value, and safe return-path resolution |
+| `app/guards/RequireAuth.tsx` | Gate account routes, never the entire storefront |
+| `app/pages/LoginRoute.tsx` | Coordinate navigation and pass callbacks into the login feature |
+| `features/auth/context/AuthProvider.tsx` | Shared session state |
+| `app/providers/AppProviders.tsx` | Compose providers and inject the selected auth service |
+
+Implementation order:
+
+1. Agree the demo session and future backend contract; choose the intended login method.
+2. Implement a typed mock auth service and session provider with explicit checking, anonymous, and authenticated states. Keep the demo clearly labeled; avoid collecting real credentials.
+3. Add account pages and register their routes before using them as redirect destinations.
+4. Capture the intended internal destination when a protected account page requires login.
+5. After session success, resolve that destination through one allowlist/policy. Fall back to `/`; reject external URLs, login loops, and unknown destinations. Handle query/hash/dynamic routes deliberately when needed.
+6. Navigate once authenticated, replacing the intermediate login history entry. Apply the same policy for already-authenticated visits to login.
+7. Add logout and clear user-specific state. If using an in-memory demo session, document that refresh resets it.
+
+Do not navigate from reusable inputs, HTTP utilities, or mock services. Keep navigation in the app-owned wrapper so auth feature code does not depend on app internals. A client route guard is UX behavior, not authorization; real backend endpoints must validate sessions and permissions.
+
+Future route examples: `/account`, `/account/orders`, and `/account/addresses`. These paths currently match the not-found route. Cookie/token strategy, session restoration, backend URLs, guest-cart merging, and guest-checkout policy remain undecided.
+
+## 9. How to add a form or flow next
+
+Example: customer addresses, which are not implemented yet.
+
+1. Add `features/account/pages/AddressesPage.tsx` for the screen.
+2. Add `features/account/components/AddressForm.tsx`, reusing shared fields/buttons.
+3. Keep address types and validation within the account feature. Add fields only after confirming address requirements.
+4. Define the service contract and a labeled mock implementation; choose the implementation at the app/provider boundary.
+5. Implement AccountLayout and session protection before registering protected account routes.
+6. Add the route and navigation link centrally. Add it to the approved login-return destinations if appropriate.
+7. Decide save, cancel, error, duplicate-submit, and persistence behavior. Ordinary form-save navigation must not be overridden by the login fallback.
+8. Verify keyboard access, mobile presentation, errors, empty data, and the successful flow.
+
+Inline forms or dialogs do not always need their own route. Add a URL when the screen needs to be independently addressable. Keep service files and additional hooks small; do not manufacture layers without a need.
+
+## 10. Phases and validation record
+
+| Phase | Current status | Remaining work |
 | --- | --- | --- |
-| A | Fix moved-file imports and layout placement | Build/lint; starter loads |
-| B | Populate shared styles, Button, TextField, Alert | Keyboard/focus/error presentation |
-| C | Select router, add exported pages/layouts, central route map | Direct URLs, Back/Forward, nested pages, not found |
-| D | Mock auth provider/service, login wrapper, guard, redirect policy | Direct login, interrupted journey, invalid destination, failed login, logout, refresh |
-| E | Account, orders, address flows | Mock loading/error/empty/success and isolated feature behavior |
-| F | Cleanup unused starter files and update README | Reference search, build/lint, browser checks |
+| Foundation | App/layout structure and styles implemented | Consolidate style values if needed |
+| Shared UI | Button and TextField implemented | Card, Alert, PasswordField remain empty |
+| Public storefront | Homepage, local products, search/categories, layout, routes implemented | Browser QA; product details later |
+| Login preview | Form and return-to-store link implemented | Mock service/session, failure/loading flows, redirect policy |
+| Account and commerce | Not implemented; cart informational placeholder only | Account, orders, addresses, real cart/checkout decisions |
+| Documentation | Current status/version update completed | Maintain alongside future changes |
+| Production readiness | Not established | Security remediation, behavior tests, backend, hosting/rendering decisions |
 
-For authorized implementation, run `npm run build` and `npm run lint`; run `npm ls --all` after dependency changes. No test runner is currently configured. Select compatible test tooling when adding meaningful tests, especially redirect policy and login integration tests. Do not claim a successful build proves authentication or navigation correctness.
+Evidence from the storefront implementation on **2026-11-18**:
 
-Documentation-task verification: repository path/size inspection, import-target existence checks, installed dependency listing, and official router documentation review. Build, lint, server startup, browser tests, and example-code compilation were not performed. The README still describes the earlier starter paths and unknown product purpose; update it after the implementation baseline is repaired, distinguishing the agreed e-commerce goal from implemented functionality.
+- `npm run build` passed TypeScript checking and the Vite production build.
+- `npm run lint` passed.
+- `npm ls --all` reported no dependency-tree problems.
+- Subsequent read-only version review found all direct versions consistent and no mismatch across 164 installed lockfile entries.
+- Local preview started, but browser verification did not complete. Preview access encountered isolation issues; Windows Computer Use then stopped because it could not confidently determine the current browser URL. No successful visual/responsive/interaction check is claimed.
+- `npm audit` reported **11 high-severity findings** in the Vite/TypeScript-ESLint tooling chain, including transitive picomatch/tinyglobby dependencies. React Router was not in that report's affected-package list. No forced or broad automatic fixes were applied. Review compatible remediation before production; this dated report is not a fresh audit.
 
-## 11. Reference policy
+This documentation update validates claims, paths, versions, and Markdown only. It does not rerun builds, lint, audit, or browser checks. Fresh-install reproducibility, automated behavior tests, and production hosting have not been verified.
 
-Re-check package versions before implementing examples. The router dependency is not yet selected; no new compatibility guarantee is implied. Keep the lockfile and verify the final integration.
+Next validation should cover public initial load, search/category combinations, clearing filters, no results, browser Back/Forward, refresh/direct URLs, login validation and return link, cart/not-found screens, keyboard focus, and narrow widths. Configure compatible test tooling when introducing automated behavior tests. Run build/lint after source changes and inspect the dependency tree after package changes.
 
-- React component design: https://react.dev/learn/thinking-in-react
-- React state organization: https://react.dev/learn/scaling-up-with-reducer-and-context
-- React app setup tradeoffs: https://react.dev/learn/build-a-react-app-from-scratch
-- Router declarative setup: https://reactrouter.com/start/declarative/installation
-- Nested layouts and routes: https://reactrouter.com/start/declarative/routing
-- Programmatic navigation: https://reactrouter.com/api/hooks/useNavigate
-- Declarative redirect component: https://reactrouter.com/api/components/Navigate
+## 11. Official references and remaining decisions
 
-Before production, decide backend/session contracts, deployment host, supported browsers, and storefront SEO/rendering requirements. The prototype architecture does not establish those decisions.
+Use installed-version documentation. The implementation uses React Router 7.18.5, not the newer release currently shown by unversioned documentation pages.
+
+- [React component design](https://react.dev/learn/thinking-in-react)
+- [React input behavior](https://react.dev/reference/react-dom/components/input)
+- [React state organization](https://react.dev/learn/scaling-up-with-reducer-and-context)
+- [React app setup tradeoffs](https://react.dev/learn/build-a-react-app-from-scratch)
+- [React Router 7.18.5 routing guide, official tagged source](https://github.com/remix-run/react-router/blob/react-router%407.18.5/docs/start/declarative/routing.md)
+- [Vite configuration](https://vite.dev/config/)
+- [Accessible field labels](https://www.w3.org/WAI/tutorials/forms/labels/)
+
+Before production, decide backend/session contracts, supported browsers, SEO/rendering needs, and deployment host. A BrowserRouter deployment will need host-specific handling of direct page URLs; preserve asset/API behavior when configuring it. No hosting configuration or deployment is currently established.
+
+The saved agent mode remains `SUGGEST`; explicit implementation requests authorize only their task scope. This documentation update did not change application code, dependencies, or AGENTS.md.

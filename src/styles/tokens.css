@@ -1,0 +1,16 @@
+:root {
+  --color-page: #f3f5f9;
+  --color-surface: #ffffff;
+  --color-text: #172033;
+  --color-muted: #526077;
+  --color-border: #c7ced9;
+  --color-primary: #4338ca;
+  --color-primary-hover: #3730a3;
+
+  --radius-control: 8px;
+  --radius-card: 20px;
+
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--color-text);
+  background: var(--color-page);
+}
